@@ -4,8 +4,8 @@ import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import {
   IERC20,
-  IUniswapV3Factory,
-  IUniswapV3Pool,
+  IElixirFactory,
+  IElixirPool,
   RangeProtocolVault,
   RangeProtocolFactory,
   SwapTest,
@@ -23,8 +23,8 @@ import { BigNumber } from "ethers";
 let factory: RangeProtocolFactory;
 let vaultImpl: RangeProtocolVault;
 let vault: RangeProtocolVault;
-let uniV3Factory: IUniswapV3Factory;
-let univ3Pool: IUniswapV3Pool;
+let elixirFactory: IElixirFactory;
+let elixirPool: IElixirPool;
 let nonfungiblePositionManager: INonfungiblePositionManager;
 let token0: IERC20;
 let token1: IERC20;
@@ -47,25 +47,16 @@ describe("RangeProtocolVault::exposure", () => {
   before(async () => {
     [manager, nonManager, user2, newManager, trader, lpProvider] =
       await ethers.getSigners();
-    const UniswapV3Factory = await ethers.getContractFactory(
-      "UniswapV3Factory"
+    elixirFactory = await ethers.getContractAt(
+        "IElixirFactory",
+        "0x43c27a9B2857C3AA5522EC2DF8d183F252DbCfE7"
     );
-    uniV3Factory = (await UniswapV3Factory.deploy()) as IUniswapV3Factory;
-
-    const NonfungiblePositionManager = await ethers.getContractFactory(
-      "NonfungiblePositionManager"
-    );
-    nonfungiblePositionManager = (await NonfungiblePositionManager.deploy(
-      uniV3Factory.address,
-      trader.address,
-      trader.address
-    )) as INonfungiblePositionManager;
 
     const RangeProtocolFactory = await ethers.getContractFactory(
       "RangeProtocolFactory"
     );
     factory = (await RangeProtocolFactory.deploy(
-      uniV3Factory.address
+      elixirFactory.address
     )) as RangeProtocolFactory;
 
     const MockERC20 = await ethers.getContractFactory("MockERC20");
@@ -78,14 +69,14 @@ describe("RangeProtocolVault::exposure", () => {
       token1 = tmp;
     }
 
-    await uniV3Factory.createPool(token0.address, token1.address, poolFee);
-    univ3Pool = (await ethers.getContractAt(
-      "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol:IUniswapV3Pool",
-      await uniV3Factory.getPool(token0.address, token1.address, poolFee)
-    )) as IUniswapV3Pool;
+    await elixirFactory.createPool(token0.address, token1.address, poolFee);
+    elixirPool = (await ethers.getContractAt(
+      "IElixirPool",
+      await elixirFactory.getPool(token0.address, token1.address, poolFee)
+    )) as IElixirPool;
 
-    await univ3Pool.initialize(encodePriceSqrt("1", "1"));
-    await univ3Pool.increaseObservationCardinalityNext("15");
+    await elixirPool.initialize(encodePriceSqrt("1", "1"));
+    await elixirPool.increaseObservationCardinalityNext("15");
 
     initializeData = getInitializeData({
       managerAddress: manager.address,
@@ -124,34 +115,6 @@ describe("RangeProtocolVault::exposure", () => {
   it("should mint with zero totalSupply of vault shares", async () => {
     await token0.connect(lpProvider).mint();
     await token1.connect(lpProvider).mint();
-
-    const {
-      mintAmount: mintAmountLpProvider,
-      amount0: amount0LpProvider,
-      amount1: amount1LpProvider,
-    } = await vault.getMintAmounts(amount0.mul(10), amount1.mul(10));
-    await token0
-      .connect(lpProvider)
-      .approve(nonfungiblePositionManager.address, amount0LpProvider);
-    await token1
-      .connect(lpProvider)
-      .approve(nonfungiblePositionManager.address, amount1LpProvider);
-
-    await nonfungiblePositionManager
-      .connect(lpProvider)
-      .mint([
-        token0.address,
-        token1.address,
-        3000,
-        lowerTick,
-        upperTick,
-        amount0LpProvider,
-        amount1LpProvider,
-        0,
-        0,
-        lpProvider.address,
-        new Date().getTime() + 10000000,
-      ]);
 
     const {
       mintAmount: mintAmount1,
@@ -212,7 +175,7 @@ describe("RangeProtocolVault::exposure", () => {
     await token0.connect(trader).approve(swapTest.address, amount0);
     await token1.connect(trader).approve(swapTest.address, amount1);
 
-    await swapTest.connect(trader).swapZeroForOne(univ3Pool.address, amount1);
+    await swapTest.connect(trader).swapZeroForOne(elixirPool.address, amount1);
 
     const { amount0Current: amount0Current2, amount1Current: amount1Current2 } =
       await vault.getUnderlyingBalances();
@@ -254,10 +217,6 @@ describe("RangeProtocolVault::exposure", () => {
     console.log("token1 amount: ", amount1Current3.toString());
     console.log("==================================================");
 
-    console.log("Remove liquidity from uniswap pool");
-    await vault.removeLiquidity();
-    console.log("==================================================");
-
     console.log("Total users vault amounts based on their initial deposits");
     const userVaults = await vault.getUserVaults(0, 0);
     const { token0VaultTotal, token1VaultTotal } = userVaults.reduce(
@@ -294,8 +253,8 @@ describe("RangeProtocolVault::exposure", () => {
     );
     const mockSqrtPriceMath = await MockSqrtPriceMath.deploy();
 
-    const { sqrtPriceX96 } = await univ3Pool.slot0();
-    const liquidity = await univ3Pool.liquidity();
+    const { sqrtPriceX96 } = await elixirPool.slot0();
+    const liquidity = await elixirPool.liquidity();
 
     const nextPrice = currentAmountBaseToken.gt(initialAmountBaseToken)
       ? // there is profit in base token that we swap to quote token
@@ -312,6 +271,10 @@ describe("RangeProtocolVault::exposure", () => {
           initialAmountBaseToken.sub(currentAmountBaseToken),
           false
         );
+
+    console.log("Remove liquidity from uniswap pool");
+    await vault.removeLiquidity();
+    console.log("==================================================");
 
     await vault.swap(
       currentAmountBaseToken.gt(initialAmountBaseToken),

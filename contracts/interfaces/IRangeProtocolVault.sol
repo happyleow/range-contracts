@@ -1,10 +1,10 @@
 //SPDX-License-Identifier: MIT
 pragma solidity 0.8.4;
 
-import {IUniswapV3MintCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
-import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
+import {IElixirMintCallback} from "../elixir/interfaces/callback/IElixirMintCallback.sol";
+import {IElixirSwapCallback} from "../elixir/interfaces/callback/IElixirSwapCallback.sol";
 
-interface IRangeProtocolVault is IUniswapV3MintCallback, IUniswapV3SwapCallback {
+interface IRangeProtocolVault is IElixirMintCallback, IElixirSwapCallback {
     event Minted(
         address indexed receiver,
         uint256 mintAmount,

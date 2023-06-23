@@ -4,18 +4,18 @@ import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import {
   IERC20,
-  IUniswapV3Factory,
-  IUniswapV3Pool,
   RangeProtocolVault,
   RangeProtocolFactory,
+  IElixirPool,
+  IElixirFactory,
 } from "../typechain";
 import { bn, getInitializeData, ZERO_ADDRESS } from "./common";
 import { Contract } from "ethers";
 
 let factory: RangeProtocolFactory;
 let vaultImpl: RangeProtocolVault;
-let uniV3Factory: IUniswapV3Factory;
-let univ3Pool: IUniswapV3Pool;
+let elixirFactory: IElixirFactory;
+let elixirPool: IElixirPool;
 let token0: IERC20;
 let token1: IERC20;
 let owner: SignerWithAddress;
@@ -30,17 +30,17 @@ describe("RangeProtocolFactory", () => {
   before(async function () {
     [owner, nonOwner, newOwner] = await ethers.getSigners();
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    const UniswapV3Factory = await ethers.getContractFactory(
-      "UniswapV3Factory"
-    );
-    uniV3Factory = (await UniswapV3Factory.deploy()) as IUniswapV3Factory;
 
+    elixirFactory = await ethers.getContractAt(
+      "IElixirFactory",
+      "0x43c27a9B2857C3AA5522EC2DF8d183F252DbCfE7"
+    );
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const RangeProtocolFactory = await ethers.getContractFactory(
       "RangeProtocolFactory"
     );
     factory = (await RangeProtocolFactory.deploy(
-      uniV3Factory.address
+      elixirFactory.address
     )) as RangeProtocolFactory;
 
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -54,11 +54,11 @@ describe("RangeProtocolFactory", () => {
       token1 = tmp;
     }
 
-    await uniV3Factory.createPool(token0.address, token1.address, poolFee);
-    univ3Pool = (await ethers.getContractAt(
-      "IUniswapV3Pool",
-      await uniV3Factory.getPool(token0.address, token1.address, poolFee)
-    )) as IUniswapV3Pool;
+    await elixirFactory.createPool(token0.address, token1.address, poolFee);
+    elixirPool = (await ethers.getContractAt(
+      "IElixirPool",
+      await elixirFactory.getPool(token0.address, token1.address, poolFee)
+    )) as IElixirPool;
 
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const RangeProtocolVault = await ethers.getContractFactory(
@@ -74,7 +74,7 @@ describe("RangeProtocolFactory", () => {
   });
 
   it("should deploy RangeProtocolFactory", async function () {
-    expect(await factory.factory()).to.be.equal(uniV3Factory.address);
+    expect(await factory.factory()).to.be.equal(elixirFactory.address);
     expect(await factory.owner()).to.be.equal(owner.address);
   });
 
@@ -127,7 +127,7 @@ describe("RangeProtocolFactory", () => {
       )
     )
       .to.emit(factory, "VaultCreated")
-      .withArgs((univ3Pool as Contract).address, anyValue);
+      .withArgs((elixirPool as Contract).address, anyValue);
 
     expect(await factory.vaultCount()).to.be.equal(1);
     expect((await factory.getVaultAddresses(0, 0))[0]).to.not.be.equal(
@@ -146,7 +146,7 @@ describe("RangeProtocolFactory", () => {
       )
     )
       .to.emit(factory, "VaultCreated")
-      .withArgs((univ3Pool as Contract).address, anyValue);
+      .withArgs((elixirPool as Contract).address, anyValue);
 
     expect(await factory.vaultCount()).to.be.equal(2);
     const vault0Address = (await factory.getVaultAddresses(0, 0))[0];

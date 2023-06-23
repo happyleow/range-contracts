@@ -2,16 +2,16 @@
 pragma solidity 0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
+import "../elixir/interfaces/IElixirPool.sol";
+import "../elixir/interfaces/callback/IElixirSwapCallback.sol";
 
-contract SwapTest is IUniswapV3SwapCallback {
+contract SwapTest is IElixirSwapCallback {
     function swapZeroForOne(address pool, int256 amountSpecified) external {
-        (uint160 sqrtRatio, , , , , , ) = IUniswapV3Pool(pool).slot0();
+        (uint160 sqrtRatio, , , , , , ) = IElixirPool(pool).slot0();
         uint160 nextSqrtRatio = sqrtRatio +
-            uint160(uint160(uint256(amountSpecified) * 2 ** 96) / IUniswapV3Pool(pool).liquidity());
+            uint160(uint160(uint256(amountSpecified) * 2 ** 96) / IElixirPool(pool).liquidity());
 
-        IUniswapV3Pool(pool).swap(
+        IElixirPool(pool).swap(
             address(msg.sender),
             false,
             amountSpecified,
@@ -28,8 +28,8 @@ contract SwapTest is IUniswapV3SwapCallback {
     ) external {
         for (uint256 i = 0; i < numTrades; i++) {
             bool zeroForOne = i % ratio > 0;
-            (uint160 sqrtRatio, , , , , , ) = IUniswapV3Pool(pool).slot0();
-            IUniswapV3Pool(pool).swap(
+            (uint160 sqrtRatio, , , , , , ) = IElixirPool(pool).slot0();
+            IElixirPool(pool).swap(
                 address(msg.sender),
                 zeroForOne,
                 amountSpecified,
@@ -45,7 +45,7 @@ contract SwapTest is IUniswapV3SwapCallback {
         int256 amountSpecified,
         uint160 sqrtPriceLimitX96
     ) external returns (int256 amount0Delta, int256 amount1Delta, uint160 nextSqrtRatio) {
-        (amount0Delta, amount1Delta) = IUniswapV3Pool(pool).swap(
+        (amount0Delta, amount1Delta) = IElixirPool(pool).swap(
             address(msg.sender),
             zeroForOne,
             amountSpecified,
@@ -53,10 +53,10 @@ contract SwapTest is IUniswapV3SwapCallback {
             abi.encode(msg.sender)
         );
 
-        (nextSqrtRatio, , , , , , ) = IUniswapV3Pool(pool).slot0();
+        (nextSqrtRatio, , , , , , ) = IElixirPool(pool).slot0();
     }
 
-    function uniswapV3SwapCallback(
+    function elixirSwapCallback(
         int256 amount0Delta,
         int256 amount1Delta,
         bytes calldata data
@@ -64,13 +64,13 @@ contract SwapTest is IUniswapV3SwapCallback {
         address sender = abi.decode(data, (address));
 
         if (amount0Delta > 0) {
-            IERC20(IUniswapV3Pool(msg.sender).token0()).transferFrom(
+            IERC20(IElixirPool(msg.sender).token0()).transferFrom(
                 sender,
                 msg.sender,
                 uint256(amount0Delta)
             );
         } else if (amount1Delta > 0) {
-            IERC20(IUniswapV3Pool(msg.sender).token1()).transferFrom(
+            IERC20(IElixirPool(msg.sender).token1()).transferFrom(
                 sender,
                 msg.sender,
                 uint256(amount1Delta)
