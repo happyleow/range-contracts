@@ -26,26 +26,26 @@ contract RangeProtocolFactory is IRangeProtocolFactory, Ownable {
     /// @notice all deployed vault instances
     address[] private _vaultsList;
 
+    address public constant GHO = 0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f;
+
     constructor(address _uniswapV3Factory) Ownable() {
         factory = _uniswapV3Factory;
     }
 
     // @notice createVault creates a ERC1967 proxy instance for the given implementation of vault contract
-    // @param tokenA one of the tokens in the uniswap pair
-    // @param tokenB the other token in the uniswap pair
+    // @param token address of the token in GHO-token pair.
     // @param fee fee tier of the uniswap pair
     // @param implementation address of the implementation
     // @param configData additional data associated with the specific implementation of vault
     function createVault(
-        address tokenA,
-        address tokenB,
+        address token,
         uint24 fee,
         address implementation,
         bytes memory data
     ) external override onlyOwner {
-        address pool = IUniswapV3Factory(factory).getPool(tokenA, tokenB, fee);
+        address pool = IUniswapV3Factory(factory).getPool(token, GHO, fee);
         if (pool == address(0x0)) revert FactoryErrors.ZeroPoolAddress();
-        address vault = _createVault(tokenA, tokenB, fee, pool, implementation, data);
+        address vault = _createVault(token, GHO, fee, pool, implementation, data);
 
         emit VaultCreated(pool, vault);
     }

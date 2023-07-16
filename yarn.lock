@@ -2,6 +2,23 @@
 # yarn lockfile v1
 
 
+"@aave/core-v3@1.19.0":
+  version "1.19.0"
+  resolved "https://registry.yarnpkg.com/@aave/core-v3/-/core-v3-1.19.0.tgz#eb3dfa63617bc5fd8d433b325e282da26f82c127"
+  integrity sha512-9Uw3FY8TFB2SWnKXtKT7b+HDt+ZV6qfXvuU/9gcNx0NiEH0Qz2IvHleHhLVhXllmkJPMAb/F324+riyvEcDWFw==
+
+"@aave/core-v3@^1.18.0":
+  version "1.18.0"
+  resolved "https://registry.yarnpkg.com/@aave/core-v3/-/core-v3-1.18.0.tgz#00b2e4bebf2f12ba8c0a21b6663bb82c63d00f9a"
+  integrity sha512-vWJdJ+Ci9LEgalm0CzKpUmYh35jD0MKYK1AftrIRoiBKCDRNXL8VpQ+60ByMWwIbCy9P81Z4G5oHy6lRduERNQ==
+
+"@aave/periphery-v3@^2.4.1":
+  version "2.4.1"
+  resolved "https://registry.yarnpkg.com/@aave/periphery-v3/-/periphery-v3-2.4.1.tgz#8c5501154bb2acf17182454bb1d4d541b8c81ff4"
+  integrity sha512-/LlhO9I9h/5tIIj2eF6kTKHMOzNlTw16oM7wM5J1sz0AcjnhPwTeCWl1kIQldXnifsFT0LJKVOqdx0VYzShYpw==
+  dependencies:
+    "@aave/core-v3" "1.19.0"
+
 "@anders-t/ethers-ledger@^1.0.4":
   version "1.0.4"
   resolved "https://registry.yarnpkg.com/@anders-t/ethers-ledger/-/ethers-ledger-1.0.4.tgz#07a981cf46cdeb9bdd86dfbc718038084d69739e"

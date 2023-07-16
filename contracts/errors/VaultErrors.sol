@@ -7,7 +7,7 @@ library VaultErrors {
     error InvalidManagingFee();
     error InvalidPerformanceFee();
     error OnlyPoolAllowed();
-    error InvalidMintAmount();
+    error InvalidCollateralAmount();
     error InvalidBurnAmount();
     error MintNotAllowed();
     error ZeroMintAmount();

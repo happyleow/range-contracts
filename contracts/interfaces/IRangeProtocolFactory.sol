@@ -6,8 +6,7 @@ interface IRangeProtocolFactory {
     event VaultImplUpgraded(address indexed uniPool, address indexed vault);
 
     function createVault(
-        address tokenA,
-        address tokenB,
+        address token,
         uint24 fee,
         address implementation,
         bytes memory configData

@@ -1,22 +1,14 @@
 //SPDX-License-Identifier: MIT
 pragma solidity 0.8.4;
 
+import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {IUniswapV3MintCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
 import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
+import {DataTypesLib} from "../libraries/DataTypesLib.sol";
 
-interface IRangeProtocolVault is IUniswapV3MintCallback, IUniswapV3SwapCallback {
-    event Minted(
-        address indexed receiver,
-        uint256 mintAmount,
-        uint256 amount0In,
-        uint256 amount1In
-    );
-    event Burned(
-        address indexed receiver,
-        uint256 burnAmount,
-        uint256 amount0Out,
-        uint256 amount1Out
-    );
+interface IRangeProtocolVault is IERC20Upgradeable, IUniswapV3MintCallback, IUniswapV3SwapCallback {
+    event Minted(address indexed receiver, uint256 shares, uint256 amount);
+    event Burned(address indexed receiver, uint256 burnAmount, uint256 amount);
     event LiquidityAdded(
         uint256 liquidityMinted,
         int24 tickLower,
@@ -36,15 +28,18 @@ interface IRangeProtocolVault is IUniswapV3MintCallback, IUniswapV3SwapCallback 
     event InThePositionStatusSet(bool inThePosition);
     event Swapped(bool zeroForOne, int256 amount0, int256 amount1);
     event TicksSet(int24 lowerTick, int24 upperTick);
-    event MintStarted();
 
     function initialize(address _pool, int24 _tickSpacing, bytes memory data) external;
 
     function updateTicks(int24 _lowerTick, int24 _upperTick) external;
 
-    function mint(uint256 mintAmount) external returns (uint256 amount0, uint256 amount1);
+    function mint(uint256 amount) external returns (uint256 shares);
 
-    function burn(uint256 burnAmount) external returns (uint256 amount0, uint256 amount1);
+    function burn(uint256 burnAmount) external returns (uint256 withdrawAmount);
+
+    function mintShares(address to, uint256 shares) external;
+
+    function burnShares(address from, uint256 shares) external;
 
     function removeLiquidity() external;
 
@@ -65,32 +60,24 @@ interface IRangeProtocolVault is IUniswapV3MintCallback, IUniswapV3SwapCallback 
 
     function updateFees(uint16 newManagingFee, uint16 newPerformanceFee) external;
 
-    function getMintAmounts(
-        uint256 amount0Max,
-        uint256 amount1Max
-    ) external view returns (uint256 amount0, uint256 amount1, uint256 mintAmount);
+    function getUnderlyingBalance() external view returns (uint256 amountCurrent);
 
-    function getUnderlyingBalances()
-        external
-        view
-        returns (uint256 amount0Current, uint256 amount1Current);
-
-    function getUnderlyingBalancesAtPrice(
-        uint160 sqrtRatioX96
-    ) external view returns (uint256 amount0Current, uint256 amount1Current);
+    function getUnderlyingBalanceByShare(uint256 shares) external view returns (uint256 amount);
 
     function getCurrentFees() external view returns (uint256 fee0, uint256 fee1);
 
     function getPositionID() external view returns (bytes32 positionID);
 
-    struct UserVaultInfo {
-        address user;
-        uint256 token0;
-        uint256 token1;
-    }
-
     function getUserVaults(
         uint256 fromIdx,
         uint256 toIdx
-    ) external view returns (UserVaultInfo[] memory);
+    ) external view returns (DataTypesLib.UserVaultInfo[] memory);
+
+    function supplyCollateral(uint256 supplyAmount) external;
+
+    function withdrawCollateral(uint256 withdrawAmount) external;
+
+    function mintGHO(uint256 mintAmount) external;
+
+    function burnGHO(uint256 burnAmount) external;
 }

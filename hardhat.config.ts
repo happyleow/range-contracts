@@ -5,7 +5,7 @@ import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-etherscan";
 import "@nomiclabs/hardhat-waffle";
 import "@typechain/hardhat";
-import "hardhat-deploy";
+// import "hardhat-deploy";
 import "solidity-coverage";
 import "@nomicfoundation/hardhat-chai-matchers";
 import "hardhat-gas-reporter"
@@ -52,6 +52,9 @@ const config: HardhatUserConfig = {
       url: "http://127.0.0.1:8545",
       accounts: [
         "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
+        "0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e",
+        "0xdf57089febbacf7ba0bc227dafbffa9fc08a93fdc68e1e42411a14efcf23656e"
       ],
     },
   },

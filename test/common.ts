@@ -2,6 +2,11 @@
 import { BigNumber } from "bignumber.js";
 import { ethers } from "hardhat";
 
+export const setStorageAt = async (address: any, index: any, value: any) => {
+    await ethers.provider.send("hardhat_setStorageAt", [address, index, value]);
+    await ethers.provider.send("evm_mine", []); // Just mines to the next block
+};
+
 // eslint-disable-next-line @typescript-eslint/naming-convention
 BigNumber.config({ EXPONENTIAL_AT: 999999, DECIMAL_PLACES: 40 });
 
