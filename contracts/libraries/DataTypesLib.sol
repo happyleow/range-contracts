@@ -3,7 +3,6 @@ pragma solidity 0.8.4;
 
 import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 
 library DataTypesLib {
@@ -34,10 +33,8 @@ library DataTypesLib {
     }
 
     struct AaveData {
-        IPool aPool;
-        IPoolAddressesProvider provider;
+        IPoolAddressesProvider poolAddressesProvider;
         IERC20Upgradeable gho;
-        //        IERC20Upgradeable aToken;
         IERC20Upgradeable collateralToken;
     }
 

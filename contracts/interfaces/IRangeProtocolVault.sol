@@ -28,6 +28,10 @@ interface IRangeProtocolVault is IERC20Upgradeable, IUniswapV3MintCallback, IUni
     event InThePositionStatusSet(bool inThePosition);
     event Swapped(bool zeroForOne, int256 amount0, int256 amount1);
     event TicksSet(int24 lowerTick, int24 upperTick);
+    event CollateralSupplied(address token, uint256 amount);
+    event CollateralWithdrawn(address token, uint256 amount);
+    event GHOMinted(uint256 amount);
+    event GHOBurned(uint256 amount);
 
     function initialize(address _pool, int24 _tickSpacing, bytes memory data) external;
 

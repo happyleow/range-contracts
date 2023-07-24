@@ -5,19 +5,16 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
-
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
-
+import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import {IRangeProtocolVault} from "./interfaces/IRangeProtocolVault.sol";
 import {OwnableUpgradeable} from "./access/OwnableUpgradeable.sol";
-import {VaultErrors} from "./errors/VaultErrors.sol";
-
 import {DataTypesLib} from "./libraries/DataTypesLib.sol";
 import {LogicLib} from "./libraries/LogicLib.sol";
+import {VaultErrors} from "./errors/VaultErrors.sol";
 
 contract RangeProtocolVault is
     Initializable,
@@ -35,28 +32,8 @@ contract RangeProtocolVault is
         _;
     }
 
-    function getPoolData() external view returns (DataTypesLib.PoolData memory) {
-        return state.poolData;
-    }
-
-    function getFeeData() external view returns (DataTypesLib.FeeData memory) {
-        return state.feeData;
-    }
-
-    function getUserVaultData(address user) external view returns (DataTypesLib.UserVault memory) {
-        return state.userData.vaults[user];
-    }
-
-    function getAaveData() external view returns (DataTypesLib.AaveData memory) {
-        return state.aaveData;
-    }
-
-    function mintShares(address to, uint256 shares) external override onlyVault {
-        _mint(to, shares);
-    }
-
-    function burnShares(address from, uint256 shares) external override onlyVault {
-        _burn(from, shares);
+    constructor() {
+        _disableInitializers();
     }
 
     function initialize(
@@ -83,17 +60,22 @@ contract RangeProtocolVault is
         state.poolData.tickSpacing = _tickSpacing;
         state.poolData.factory = msg.sender;
 
-        if (address(state.poolData.token0) == LogicLib.GHO) state.poolData.isToken0GHO = true;
         state.poolData.decimals0 = IERC20MetadataUpgradeable(address(state.poolData.token0))
             .decimals();
         state.poolData.decimals1 = IERC20MetadataUpgradeable(address(state.poolData.token1))
             .decimals();
 
-        state.aaveData.aPool = IPool(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
-        state.aaveData.collateralToken = state.poolData.isToken0GHO
-            ? state.poolData.token1
-            : state.poolData.token0;
-        state.aaveData.gho = state.poolData.token0;
+        state.aaveData.poolAddressesProvider = IPoolAddressesProvider(
+            0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e
+        );
+        if (address(state.poolData.token0) == LogicLib.GHO) {
+            state.poolData.isToken0GHO = true;
+            state.aaveData.gho = state.poolData.token0;
+            state.aaveData.collateralToken = state.poolData.token1;
+        } else {
+            state.aaveData.gho = state.poolData.token1;
+            state.aaveData.collateralToken = state.poolData.token0;
+        }
 
         // Managing fee is 0% at the time vault initialization.
         LogicLib.updateFees(state.feeData, 0, 250);
@@ -109,6 +91,14 @@ contract RangeProtocolVault is
 
     function unpause() external onlyManager {
         _unpause();
+    }
+
+    function mintShares(address to, uint256 shares) external override onlyVault {
+        _mint(to, shares);
+    }
+
+    function burnShares(address from, uint256 shares) external override onlyVault {
+        _burn(from, shares);
     }
 
     function uniswapV3MintCallback(
@@ -197,35 +187,6 @@ contract RangeProtocolVault is
         return LogicLib.userCount(state.userData);
     }
 
-    function getPositionID() public view override returns (bytes32 positionID) {
-        return LogicLib.getPositionID(state.poolData);
-    }
-
-    function getUnderlyingBalance() public view override returns (uint256 amountCurrent) {
-        return LogicLib.getUnderlyingBalance(state.poolData, state.feeData, state.aaveData);
-    }
-
-    function getUnderlyingBalanceByShare(
-        uint256 shares
-    ) external view override returns (uint256 amount) {
-        return
-            LogicLib.getUnderlyingBalanceByShare(
-                state.poolData,
-                state.feeData,
-                state.aaveData,
-                shares
-            );
-    }
-
-    function _authorizeUpgrade(address) internal override {
-        if (msg.sender != state.poolData.factory) revert VaultErrors.OnlyFactoryAllowed();
-    }
-
-    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override {
-        super._beforeTokenTransfer(from, to, amount);
-        LogicLib._beforeTokenTransfer(state.userData, from, to, amount);
-    }
-
     function supplyCollateral(uint256 supplyAmount) external override onlyManager {
         LogicLib.supplyCollateral(state.aaveData, supplyAmount);
     }
@@ -255,5 +216,50 @@ contract RangeProtocolVault is
         )
     {
         return LogicLib.getAavePositionData(state.aaveData);
+    }
+
+    function getPoolData() external view returns (DataTypesLib.PoolData memory) {
+        return state.poolData;
+    }
+
+    function getFeeData() external view returns (DataTypesLib.FeeData memory) {
+        return state.feeData;
+    }
+
+    function getUserVaultData(address user) external view returns (DataTypesLib.UserVault memory) {
+        return state.userData.vaults[user];
+    }
+
+    function getAaveData() external view returns (DataTypesLib.AaveData memory) {
+        return state.aaveData;
+    }
+
+    function getPositionID() public view override returns (bytes32 positionID) {
+        return LogicLib.getPositionID(state.poolData);
+    }
+
+    function getUnderlyingBalance() public view override returns (uint256 amountCurrent) {
+        return LogicLib.getUnderlyingBalance(state.poolData, state.feeData, state.aaveData);
+    }
+
+    function getUnderlyingBalanceByShare(
+        uint256 shares
+    ) external view override returns (uint256 amount) {
+        return
+            LogicLib.getUnderlyingBalanceByShare(
+                state.poolData,
+                state.feeData,
+                state.aaveData,
+                shares
+            );
+    }
+
+    function _authorizeUpgrade(address) internal override {
+        if (msg.sender != state.poolData.factory) revert VaultErrors.OnlyFactoryAllowed();
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override {
+        super._beforeTokenTransfer(from, to, amount);
+        LogicLib._beforeTokenTransfer(state.userData, from, to, amount);
     }
 }

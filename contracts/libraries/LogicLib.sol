@@ -4,14 +4,13 @@ pragma solidity 0.8.4;
 import {SafeERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
-
+import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import {LiquidityAmounts} from "../uniswap/LiquidityAmounts.sol";
 import {FullMath} from "../uniswap/FullMath.sol";
 import {TickMath} from "../uniswap/TickMath.sol";
 import {DataTypesLib} from "./DataTypesLib.sol";
-
 import {IRangeProtocolVault} from "../interfaces/IRangeProtocolVault.sol";
-
+import {IPriceOracleExtended} from "../interfaces/IPriceOracleExtended.sol";
 import {VaultErrors} from "../errors/VaultErrors.sol";
 
 library LogicLib {
@@ -43,6 +42,10 @@ library LogicLib {
     event InThePositionStatusSet(bool inThePosition);
     event Swapped(bool zeroForOne, int256 amount0, int256 amount1);
     event TicksSet(int24 lowerTick, int24 upperTick);
+    event CollateralSupplied(address token, uint256 amount);
+    event CollateralWithdrawn(address token, uint256 amount);
+    event GHOMinted(uint256 amount);
+    event GHOBurned(uint256 amount);
 
     function updateTicks(
         DataTypesLib.PoolData storage poolData,
@@ -106,7 +109,6 @@ library LogicLib {
         } else {
             shares = amount;
         }
-
         vault.mintShares(msg.sender, shares);
 
         if (!userData.vaults[msg.sender].exists) {
@@ -386,9 +388,9 @@ library LogicLib {
         uint256 token0Balance = poolData.token0.balanceOf(address(this));
         uint256 token1Balance = poolData.token1.balanceOf(address(this));
         if (poolData.isToken0GHO) {
-            token0Balance = (token0Balance * poolData.decimals1) / 10 ** 18;
+            token0Balance = (token0Balance * 10 ** poolData.decimals1) / 10 ** poolData.decimals0;
         } else {
-            token1Balance = (token1Balance * poolData.decimals0) / 10 ** 18;
+            token1Balance = (token1Balance * 10 ** poolData.decimals0) / 10 ** poolData.decimals1;
         }
 
         uint256 balanceFromAave = getCurrentBalanceFromAave(poolData, aaveData);
@@ -424,14 +426,14 @@ library LogicLib {
                 uint256(tokensOwed1);
             (fee0, fee1) = _netPerformanceFees(feeData, fee0, fee1);
 
+            uint8 decimals0 = poolData.decimals0;
+            uint8 decimals1 = poolData.decimals1;
             if (poolData.isToken0GHO) {
-                uint8 decimals = poolData.decimals1;
-                amount0Current = (amount0Current * decimals) / 10 ** 18;
-                fee0 = (fee0 * decimals) / 10 ** 18;
+                amount0Current = (amount0Current * 10 ** decimals1) / 10 ** decimals0;
+                fee0 = (fee0 * 10 ** decimals1) / 10 ** decimals0;
             } else {
-                uint8 decimals = poolData.decimals0;
-                amount1Current = (amount1Current * decimals) / 10 ** 18;
-                fee1 = (fee1 * decimals) / 10 ** 18;
+                amount1Current = (amount1Current * 10 ** decimals0) / 10 ** decimals1;
+                fee1 = (fee1 * 10 ** decimals0) / 10 ** decimals1;
             }
 
             amount = amount0Current + amount1Current + fee0 + fee1;
@@ -442,14 +444,17 @@ library LogicLib {
         DataTypesLib.PoolData storage poolData,
         DataTypesLib.AaveData storage aaveData
     ) public view returns (uint256 amount) {
-        (uint256 totalCollateralBase, uint256 totalDebtBase, , , , ) = aaveData
-            .aPool
-            .getUserAccountData(address(this));
+        (uint256 totalCollateralBase, uint256 totalDebtBase, , , , ) = IPool(
+            aaveData.poolAddressesProvider.getPool()
+        ).getUserAccountData(address(this));
 
+        uint256 BASE_CURRENCY_UNIT = IPriceOracleExtended(
+            aaveData.poolAddressesProvider.getPriceOracle()
+        ).BASE_CURRENCY_UNIT();
         amount = totalCollateralBase - totalDebtBase;
         amount = poolData.isToken0GHO
-            ? (amount * poolData.decimals1) / 10 ** 8
-            : (amount * poolData.decimals0) / 10 ** 8;
+            ? (amount * 10 ** poolData.decimals1) / BASE_CURRENCY_UNIT
+            : (amount * 10 ** poolData.decimals0) / BASE_CURRENCY_UNIT;
     }
 
     function _beforeTokenTransfer(
@@ -549,7 +554,7 @@ library LogicLib {
         uint256 fee1
     ) private {
         uint256 _performanceFee = feeData.performanceFee;
-        if (poolData.token0 == aaveData.gho) {
+        if (address(poolData.token0) == GHO) {
             feeData.managerBalanceGHO += (fee0 * _performanceFee) / 10_000;
             feeData.managerBalanceToken += (fee1 * _performanceFee) / 10_000;
         } else {
@@ -582,24 +587,40 @@ library LogicLib {
         DataTypesLib.AaveData storage aaveData,
         uint256 supplyAmount
     ) external {
-        aaveData.collateralToken.approve(address(aaveData.aPool), supplyAmount);
-        aaveData.aPool.supply(address(aaveData.collateralToken), supplyAmount, address(this), 0);
+        IPool aavePool = IPool(aaveData.poolAddressesProvider.getPool());
+        aaveData.collateralToken.approve(address(aavePool), supplyAmount);
+        aavePool.supply(address(aaveData.collateralToken), supplyAmount, address(this), 0);
+        emit CollateralSupplied(address(aaveData.collateralToken), supplyAmount);
     }
 
     function withdrawCollateral(
         DataTypesLib.AaveData storage aaveData,
         uint256 withdrawAmount
     ) external {
-        aaveData.aPool.withdraw(address(aaveData.collateralToken), withdrawAmount, address(this));
+        IPool(aaveData.poolAddressesProvider.getPool()).withdraw(
+            address(aaveData.collateralToken),
+            withdrawAmount,
+            address(this)
+        );
+        emit CollateralWithdrawn(address(aaveData.collateralToken), withdrawAmount);
     }
 
     function mintGHO(DataTypesLib.AaveData storage aaveData, uint256 mintAmount) external {
-        aaveData.aPool.borrow(address(aaveData.gho), mintAmount, 2, 0, address(this));
+        IPool(aaveData.poolAddressesProvider.getPool()).borrow(
+            address(aaveData.gho),
+            mintAmount,
+            2,
+            0,
+            address(this)
+        );
+        emit GHOMinted(mintAmount);
     }
 
     function burnGHO(DataTypesLib.AaveData storage aaveData, uint256 burnAmount) external {
-        aaveData.gho.approve(address(aaveData.aPool), burnAmount);
-        aaveData.aPool.repay(address(aaveData.gho), burnAmount, 2, address(this));
+        IPool aavePool = IPool(aaveData.poolAddressesProvider.getPool());
+        aaveData.gho.approve(address(aavePool), burnAmount);
+        aavePool.repay(address(aaveData.gho), burnAmount, 2, address(this));
+        emit GHOBurned(burnAmount);
     }
 
     function getAavePositionData(
@@ -616,6 +637,6 @@ library LogicLib {
             uint256 healthFactor
         )
     {
-        return aaveData.aPool.getUserAccountData(address(this));
+        return IPool(aaveData.poolAddressesProvider.getPool()).getUserAccountData(address(this));
     }
 }

@@ -28,7 +28,7 @@ let initializeData: any;
 const GHO = "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f";
 const USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
 
-describe.only("RangeProtocolFactory", () => {
+describe("RangeProtocolFactory", () => {
   before(async function () {
     [owner, nonOwner, newOwner] = await ethers.getSigners();
 
