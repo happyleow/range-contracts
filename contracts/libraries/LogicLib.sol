@@ -17,7 +17,6 @@ library LogicLib {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using TickMath for int24;
 
-    address public constant GHO = 0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f;
     uint16 public constant MAX_PERFORMANCE_FEE_BPS = 1000;
     uint16 public constant MAX_MANAGING_FEE_BPS = 100;
 
@@ -254,7 +253,6 @@ library LogicLib {
     function collectManager(
         DataTypesLib.PoolData storage poolData,
         DataTypesLib.FeeData storage feeData,
-        DataTypesLib.AaveData storage aaveData,
         address manager
     ) external {
         uint256 ghoAmount = feeData.managerBalanceGHO;
@@ -342,10 +340,6 @@ library LogicLib {
             });
         }
         return usersVaultInfo;
-    }
-
-    function userCount(DataTypesLib.UserData storage userData) external view returns (uint256) {
-        return userData.users.length;
     }
 
     function getPositionID(
@@ -554,7 +548,7 @@ library LogicLib {
         uint256 fee1
     ) private {
         uint256 _performanceFee = feeData.performanceFee;
-        if (address(poolData.token0) == GHO) {
+        if (poolData.token0 == aaveData.gho) {
             feeData.managerBalanceGHO += (fee0 * _performanceFee) / 10_000;
             feeData.managerBalanceToken += (fee1 * _performanceFee) / 10_000;
         } else {

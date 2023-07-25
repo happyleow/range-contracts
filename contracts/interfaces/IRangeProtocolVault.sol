@@ -5,8 +5,9 @@ import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20
 import {IUniswapV3MintCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol";
 import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import {DataTypesLib} from "../libraries/DataTypesLib.sol";
+import {IRangeProtocolVaultGetters} from "./IRangeProtocolVaultGetters.sol";
 
-interface IRangeProtocolVault is IERC20Upgradeable, IUniswapV3MintCallback, IUniswapV3SwapCallback {
+interface IRangeProtocolVault is IERC20Upgradeable, IUniswapV3MintCallback, IUniswapV3SwapCallback, IRangeProtocolVaultGetters {
     event Minted(address indexed receiver, uint256 shares, uint256 amount);
     event Burned(address indexed receiver, uint256 burnAmount, uint256 amount);
     event LiquidityAdded(

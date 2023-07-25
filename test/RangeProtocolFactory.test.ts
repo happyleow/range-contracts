@@ -9,7 +9,7 @@ import {
   RangeProtocolVault,
   RangeProtocolFactory,
 } from "../typechain";
-import { bn, getInitializeData, ZERO_ADDRESS } from "./common";
+import { getInitializeData, ZERO_ADDRESS } from "./common";
 import { Contract } from "ethers";
 
 let factory: RangeProtocolFactory;
@@ -67,6 +67,8 @@ describe("RangeProtocolFactory", () => {
       managerAddress: owner.address,
       name,
       symbol,
+      gho: "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
+      poolAddressesProvider: "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e"
     });
   });
 

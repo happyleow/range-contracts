@@ -3,8 +3,8 @@ import { BigNumber } from "bignumber.js";
 import { ethers } from "hardhat";
 
 export const setStorageAt = async (address: any, index: any, value: any) => {
-    await ethers.provider.send("hardhat_setStorageAt", [address, index, value]);
-    await ethers.provider.send("evm_mine", []); // Just mines to the next block
+  await ethers.provider.send("hardhat_setStorageAt", [address, index, value]);
+  await ethers.provider.send("evm_mine", []); // Just mines to the next block
 };
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -33,13 +33,17 @@ export const getInitializeData = (params: {
   managerAddress: string;
   name: string;
   symbol: string;
+  gho: string;
+  poolAddressesProvider: string;
 }): any =>
   ethers.utils.defaultAbiCoder.encode(
-    ["address", "string", "string"],
+    ["address", "string", "string", "address", "address"],
     [
       params.managerAddress,
       params.name,
       params.symbol,
+      params.gho,
+      params.poolAddressesProvider,
     ]
   );
 

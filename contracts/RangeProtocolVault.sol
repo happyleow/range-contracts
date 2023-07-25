@@ -10,6 +10,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/
 import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
+import {RangeProtocolVaultStorage} from "./RangeProtocolVaultStorage.sol";
 import {IRangeProtocolVault} from "./interfaces/IRangeProtocolVault.sol";
 import {OwnableUpgradeable} from "./access/OwnableUpgradeable.sol";
 import {DataTypesLib} from "./libraries/DataTypesLib.sol";
@@ -23,10 +24,8 @@ contract RangeProtocolVault is
     OwnableUpgradeable,
     ERC20Upgradeable,
     PausableUpgradeable,
-    IRangeProtocolVault
+    RangeProtocolVaultStorage
 {
-    DataTypesLib.State internal state;
-
     modifier onlyVault() {
         if (msg.sender != address(this)) revert();
         _;
@@ -41,9 +40,9 @@ contract RangeProtocolVault is
         int24 _tickSpacing,
         bytes memory data
     ) external override initializer {
-        (address manager, string memory _name, string memory _symbol) = abi.decode(
+        (address manager, string memory _name, string memory _symbol, address _gho, address _poolAddressesProvider) = abi.decode(
             data,
-            (address, string, string)
+            (address, string, string, address, address)
         );
 
         __UUPSUpgradeable_init();
@@ -65,10 +64,8 @@ contract RangeProtocolVault is
         state.poolData.decimals1 = IERC20MetadataUpgradeable(address(state.poolData.token1))
             .decimals();
 
-        state.aaveData.poolAddressesProvider = IPoolAddressesProvider(
-            0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e
-        );
-        if (address(state.poolData.token0) == LogicLib.GHO) {
+        state.aaveData.poolAddressesProvider = IPoolAddressesProvider(_poolAddressesProvider);
+        if (address(state.poolData.token0) == _gho) {
             state.poolData.isToken0GHO = true;
             state.aaveData.gho = state.poolData.token0;
             state.aaveData.collateralToken = state.poolData.token1;
@@ -162,7 +159,7 @@ contract RangeProtocolVault is
     }
 
     function collectManager() external override onlyManager {
-        LogicLib.collectManager(state.poolData, state.feeData, state.aaveData, manager());
+        LogicLib.collectManager(state.poolData, state.feeData, manager());
     }
 
     function updateFees(
@@ -181,10 +178,6 @@ contract RangeProtocolVault is
         uint256 toIdx
     ) external view override returns (DataTypesLib.UserVaultInfo[] memory) {
         return LogicLib.getUserVaults(state.userData, fromIdx, toIdx);
-    }
-
-    function userCount() external view returns (uint256) {
-        return LogicLib.userCount(state.userData);
     }
 
     function supplyCollateral(uint256 supplyAmount) external override onlyManager {
@@ -216,22 +209,6 @@ contract RangeProtocolVault is
         )
     {
         return LogicLib.getAavePositionData(state.aaveData);
-    }
-
-    function getPoolData() external view returns (DataTypesLib.PoolData memory) {
-        return state.poolData;
-    }
-
-    function getFeeData() external view returns (DataTypesLib.FeeData memory) {
-        return state.feeData;
-    }
-
-    function getUserVaultData(address user) external view returns (DataTypesLib.UserVault memory) {
-        return state.userData.vaults[user];
-    }
-
-    function getAaveData() external view returns (DataTypesLib.AaveData memory) {
-        return state.aaveData;
     }
 
     function getPositionID() public view override returns (bytes32 positionID) {

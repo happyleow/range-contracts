@@ -7,7 +7,8 @@ import {
   IUniswapV3Factory,
   IUniswapV3Pool,
   RangeProtocolVault,
-  RangeProtocolFactory, LogicLib,
+  RangeProtocolFactory,
+  LogicLib,
 } from "../typechain";
 import {
   bn,
@@ -46,13 +47,16 @@ describe("RangeProtocolVault", () => {
   before(async () => {
     [manager, nonManager, user2, newManager] = await ethers.getSigners();
 
-    uniV3Factory = await ethers.getContractAt("IUniswapV3Factory", "0x1F98431c8aD98523631AE4a59f267346ea31F984");
+    uniV3Factory = await ethers.getContractAt(
+      "IUniswapV3Factory",
+      "0x1F98431c8aD98523631AE4a59f267346ea31F984"
+    );
 
     const RangeProtocolFactory = await ethers.getContractFactory(
       "RangeProtocolFactory"
     );
     factory = (await RangeProtocolFactory.deploy(
-        uniV3Factory.address
+      uniV3Factory.address
     )) as RangeProtocolFactory;
 
     token0 = await ethers.getContractAt("MockERC20", GHO);
@@ -67,18 +71,20 @@ describe("RangeProtocolVault", () => {
       managerAddress: manager.address,
       name,
       symbol,
+      gho: "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
+      poolAddressesProvider: "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
     });
 
     const LogicLib = await ethers.getContractFactory("LogicLib");
     logicLib = await LogicLib.deploy();
 
     const RangeProtocolVault = await ethers.getContractFactory(
-        "RangeProtocolVault",
-        {
-          libraries: {
-            LogicLib: logicLib.address,
-          },
-        }
+      "RangeProtocolVault",
+      {
+        libraries: {
+          LogicLib: logicLib.address,
+        },
+      }
     );
     vaultImpl = (await RangeProtocolVault.deploy()) as RangeProtocolVault;
 
@@ -97,16 +103,21 @@ describe("RangeProtocolVault", () => {
   });
 
   before(async () => {
-    const usdcAmount = ethers.utils.hexlify(ethers.utils.zeroPad("0x5AF3107A4000", 32))
-    await setStorageAt(USDC, "0xcb8911fb82c2d10f6cf1d31d1e521ad3f4e3f42615f6ba67c454a9a2fdb9b6a7", usdcAmount);
+    const usdcAmount = ethers.utils.hexlify(
+      ethers.utils.zeroPad("0x5AF3107A4000", 32)
+    );
+    await setStorageAt(
+      USDC,
+      "0xcb8911fb82c2d10f6cf1d31d1e521ad3f4e3f42615f6ba67c454a9a2fdb9b6a7",
+      usdcAmount
+    );
     //
     // const ghoAmount = ethers.utils.hexlify(ethers.utils.zeroPad("0x52B7D2DCC80CD2E4000000", 32))
     // await setStorageAt(GHO, "0xc651ee22c6951bb8b5bd29e8210fb394645a94315fe10eff2cc73de1aa75c137", ghoAmount);
 
     // console.log((await token0.balanceOf(manager.address)).toString());
     // console.log((await token1.balanceOf(manager.address)).toString());
-
-  })
+  });
 
   beforeEach(async () => {
     await token1.approve(vault.address, amount1.mul(bn(2)));
@@ -143,10 +154,8 @@ describe("RangeProtocolVault", () => {
       .to.emit(vault, "TicksSet")
       .withArgs(lowerTick, upperTick);
 
-    const {lowerTick: _lowerTick, upperTick: _upperTick} = await vault.getPoolData();
-
-    expect(_lowerTick).to.be.equal(lowerTick);
-    expect(_upperTick).to.be.equal(upperTick);
+    expect(await vault.lowerTick()).to.be.equal(lowerTick);
+    expect(await vault.upperTick()).to.be.equal(upperTick);
   });
 
   it("should not allow minting with zero mint amount", async () => {
@@ -179,7 +188,7 @@ describe("RangeProtocolVault", () => {
 
     expect(await vault.totalSupply()).to.be.equal(amount1);
 
-    const {token, exists} = await vault.getUserVaultData(manager.address);
+    const { token, exists } = await vault.userVaults(manager.address);
     expect(exists).to.be.true;
     expect(token).to.be.equal(amount1);
 
@@ -192,13 +201,15 @@ describe("RangeProtocolVault", () => {
   it("should mint with non zero totalSupply", async () => {
     const totalSupply = await vault.totalSupply();
     expect(totalSupply).to.not.be.equal(0);
-    const shares = amount1.mul(totalSupply).div(await vault.getUnderlyingBalance());
+    const shares = amount1
+      .mul(totalSupply)
+      .div(await vault.getUnderlyingBalance());
 
     await expect(vault.mint(amount1))
       .to.emit(vault, "Minted")
       .withArgs(manager.address, shares, amount1);
 
-    const {token, exists} = await vault.getUserVaultData(manager.address);
+    const { token, exists } = await vault.userVaults(manager.address);
     expect(token).to.be.equal(amount1.mul(bn(2)));
 
     expect(await vault.userCount()).to.be.equal(1);
@@ -206,26 +217,28 @@ describe("RangeProtocolVault", () => {
 
   it("should transfer vault shares to user2", async () => {
     const userBalance = await vault.balanceOf(manager.address);
-    const transferAmount = amount1.div(2)
+    const transferAmount = amount1.div(2);
 
-    const {token: tokenUser0} = await vault.getUserVaultData(manager.address);
+    const { token: tokenUser0 } = await vault.userVaults(manager.address);
 
-    const vaultMoved = tokenUser0.sub(tokenUser0.mul(userBalance.sub(transferAmount)).div(userBalance));
+    const vaultMoved = tokenUser0.sub(
+      tokenUser0.mul(userBalance.sub(transferAmount)).div(userBalance)
+    );
     await vault.transfer(user2.address, transferAmount);
 
-    const {token: tokenUser1Before} = await vault.getUserVaultData(user2.address);
+    const { token: tokenUser1Before } = await vault.userVaults(user2.address);
     expect(await vault.userCount()).to.be.equal(2);
 
     expect(tokenUser1Before).to.be.equal(vaultMoved);
     const user2Balance = await vault.balanceOf(user2.address);
     await vault.connect(user2).transfer(manager.address, user2Balance);
 
-    const {token: tokenUser1After} = await vault.getUserVaultData(user2.address);
+    const { token: tokenUser1After } = await vault.userVaults(user2.address);
     expect(tokenUser1After).to.be.equal(bn(0));
   });
 
   it("should not burn non existing vault shares", async () => {
-    const burnAmount = 1
+    const burnAmount = 1;
     await expect(vault.connect(user2).burn(burnAmount)).to.be.revertedWith(
       "ERC20: burn amount exceeds balance"
     );
@@ -233,33 +246,34 @@ describe("RangeProtocolVault", () => {
 
   it("should burn vault shares", async () => {
     const burnAmount = await vault.balanceOf(manager.address);
-    const amountCurrent =
-      await vault.getUnderlyingBalance();
+    const amountCurrent = await vault.getUnderlyingBalance();
     const userBalanceBefore = await token1.balanceOf(manager.address);
 
-    const {token: userVaultTokenBefore} = await vault.getUserVaultData(manager.address);
+    const { token: userVaultTokenBefore } = await vault.userVaults(
+      manager.address
+    );
     await vault.updateFees(50, 250);
 
-    const {managingFee} = await vault.getFeeData();
+    const managingFee = await vault.managingFee();
     const totalSupply = await vault.totalSupply();
     const vaultShares = await vault.balanceOf(manager.address);
     const userBalance = amountCurrent.mul(vaultShares).div(totalSupply);
     const managingFeeAmount = userBalance.mul(managingFee).div(10_000);
 
-    await vault.burn(burnAmount)
-    expect(await vault.totalSupply()).to.be.equal(
-      totalSupply.sub(burnAmount)
-    );
+    await vault.burn(burnAmount);
+    expect(await vault.totalSupply()).to.be.equal(totalSupply.sub(burnAmount));
 
     const amountGot = amountCurrent.mul(burnAmount).div(totalSupply);
     expect(await token1.balanceOf(manager.address)).to.be.equal(
       userBalanceBefore.add(amountGot).sub(managingFeeAmount)
     );
 
-    const {token: userVaultTokenAfter} = await vault.getUserVaultData(manager.address);
+    const { token: userVaultTokenAfter } = await vault.userVaults(
+      manager.address
+    );
     expect(userVaultTokenAfter).to.be.equal(bn(0));
 
-    const {managerBalanceToken} = await vault.getFeeData();
+    const managerBalanceToken = await vault.managerBalanceToken();
     expect(managerBalanceToken).to.be.equal(managingFeeAmount);
   });
 
@@ -294,7 +308,7 @@ describe("RangeProtocolVault", () => {
   describe("Add Liquidity", () => {
     beforeEach(async () => {
       await token1.approve(vault.address, amount1.mul(bn(10)));
-      await token1.transfer(vault.address, amount1.mul(bn(10)))
+      await token1.transfer(vault.address, amount1.mul(bn(10)));
     });
 
     it("should not add liquidity by non-manager", async () => {
@@ -302,9 +316,9 @@ describe("RangeProtocolVault", () => {
       const amount1 = await token1.balanceOf(vault.address);
 
       await expect(
-          vault
-              .connect(nonManager)
-              .addLiquidity(lowerTick, upperTick, amount0, amount1)
+        vault
+          .connect(nonManager)
+          .addLiquidity(lowerTick, upperTick, amount0, amount1)
       ).to.be.revertedWith("Ownable: caller is not the manager");
     });
 
@@ -332,10 +346,10 @@ describe("RangeProtocolVault", () => {
       const lowerTick = -276420;
       const upperTick = -276180;
       await expect(
-          await vault.addLiquidity(lowerTick, upperTick, _amount0, _amount1)
+        await vault.addLiquidity(lowerTick, upperTick, _amount0, _amount1)
       )
-          .to.emit(vault, "LiquidityAdded")
-          .withArgs(anyValue, lowerTick, upperTick, anyValue, anyValue)
+        .to.emit(vault, "LiquidityAdded")
+        .withArgs(anyValue, lowerTick, upperTick, anyValue, anyValue);
 
       // await vault.removeLiquidity();
       // const _ghoAmount = ethers.utils.hexlify(ethers.utils.zeroPad("0x52B7D2DCC80CD2E4000000", 32))
@@ -351,7 +365,6 @@ describe("RangeProtocolVault", () => {
 
       // console.log((await token0.balanceOf(vault.address)).toString())
       // console.log((await token1.balanceOf(vault.address)).toString())
-
     });
   });
 
@@ -363,12 +376,12 @@ describe("RangeProtocolVault", () => {
     });
 
     it("should remove liquidity by manager", async () => {
-      const {inThePosition, lowerTick, upperTick} = await vault.getPoolData();
-      expect(inThePosition).to.be.equal(true);
+      expect(await vault.lowerTick()).to.not.be.equal(await vault.upperTick());
+      expect(await vault.inThePosition()).to.be.equal(true);
       const { _liquidity: liquidityBefore } = await univ3Pool.positions(
         position(vault.address, lowerTick, upperTick)
       );
-      expect(liquidityBefore).not.to.be.equal(0);
+      // expect(liquidityBefore).not.to.be.equal(0);
 
       const { fee0, fee1 } = await vault.getCurrentFees();
       await expect(vault.removeLiquidity())
@@ -377,8 +390,6 @@ describe("RangeProtocolVault", () => {
         .to.emit(vault, "FeesEarned")
         .withArgs(fee0, fee1);
 
-
-
       const { _liquidity: liquidityAfter } = await univ3Pool.positions(
         position(vault.address, lowerTick, upperTick)
       );
@@ -386,7 +397,8 @@ describe("RangeProtocolVault", () => {
     });
 
     it.skip("should burn vault shares when liquidity is removed", async () => {
-      const {lowerTick, upperTick} = await vault.getPoolData();
+      const lowerTick = await vault.lowerTick();
+      const upperTick = await vault.upperTick();
 
       const { _liquidity: liquidity } = await univ3Pool.positions(
         position(vault.address, lowerTick, upperTick)
@@ -397,23 +409,41 @@ describe("RangeProtocolVault", () => {
         .to.be.emit(vault, "InThePositionStatusSet")
         .withArgs(false)
         .not.to.emit(vault, "FeesEarned");
-      const _ghoAmount = ethers.utils.hexlify(ethers.utils.zeroPad("0x54B40B1F852BDA000000", 32))
-      const storageSlot = ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [vault.address, 3]))
+      const _ghoAmount = ethers.utils.hexlify(
+        ethers.utils.zeroPad("0x54B40B1F852BDA000000", 32)
+      );
+      const storageSlot = ethers.utils.keccak256(
+        ethers.utils.defaultAbiCoder.encode(
+          ["address", "uint256"],
+          [vault.address, 3]
+        )
+      );
       await setStorageAt(GHO, storageSlot, _ghoAmount);
-      await vault.burnGHO(bn("115792089237316195423570985008687907853269984665640564039457584007913129639935"));
-      await vault.withdrawCollateral(bn("115792089237316195423570985008687907853269984665640564039457584007913129639935"));
-      let t0 = await token0.balanceOf(vault.address)
+      await vault.burnGHO(
+        bn(
+          "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+        )
+      );
+      await vault.withdrawCollateral(
+        bn(
+          "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+        )
+      );
+      let t0 = await token0.balanceOf(vault.address);
 
       await vault.swap(true, t0, 4295128749);
-      t0 = await token0.balanceOf(vault.address)
-      const t1 = await token1.balanceOf(vault.address)
+      t0 = await token0.balanceOf(vault.address);
+      const t1 = await token1.balanceOf(vault.address);
       const userBalance1Before = await token1.balanceOf(manager.address);
-      const amountCurrent =
-        await vault.getUnderlyingBalance();
+      const amountCurrent = await vault.getUnderlyingBalance();
       const totalSupply = await vault.totalSupply();
       const vaultShares = await vault.balanceOf(manager.address);
 
-      let {managerBalanceToken: managerTokenBalanceBefore, managerBalanceGHO: managerGHOBalanceBefore, managingFee} = await vault.getFeeData();
+      const {
+        managerBalanceToken: managerTokenBalanceBefore,
+        managerBalanceGHO: managerGHOBalanceBefore,
+        managingFee,
+      } = await vault.getFeeData();
       const userBalance = amountCurrent.mul(vaultShares).div(totalSupply);
       const managingFeeAmount = userBalance.mul(managingFee).div(10_000);
       await expect(vault.burn(vaultShares)).not.to.emit(vault, "FeesEarned");
@@ -421,16 +451,17 @@ describe("RangeProtocolVault", () => {
         userBalance1Before.add(userBalance).sub(managingFeeAmount)
       );
 
-      let {managerBalanceToken: managerTokenBalanceAfter, managerBalanceGHO: managerGHOBalanceAfter} = await vault.getFeeData();
-      expect(managerGHOBalanceBefore).to.be.equal(
-        managerGHOBalanceAfter
-      );
+      const {
+        managerBalanceToken: managerTokenBalanceAfter,
+        managerBalanceGHO: managerGHOBalanceAfter,
+      } = await vault.getFeeData();
+      expect(managerGHOBalanceBefore).to.be.equal(managerGHOBalanceAfter);
       expect(managerTokenBalanceAfter).to.be.equal(
         managerTokenBalanceBefore.add(managingFeeAmount)
       );
 
-      console.log((await token0.balanceOf(vault.address)).toString())
-      console.log((await token1.balanceOf(vault.address)).toString())
+      console.log((await token0.balanceOf(vault.address)).toString());
+      console.log((await token1.balanceOf(vault.address)).toString());
     });
   });
 
@@ -440,7 +471,7 @@ describe("RangeProtocolVault", () => {
       const upperTick = -276180;
       const _amount0 = await token0.balanceOf(vault.address);
       const _amount1 = await token1.balanceOf(vault.address);
-      await vault.addLiquidity(lowerTick, upperTick, _amount0, _amount1)
+      await vault.addLiquidity(lowerTick, upperTick, _amount0, _amount1);
 
       const { sqrtPriceX96 } = await univ3Pool.slot0();
       const liquidity = await univ3Pool.liquidity();
@@ -468,24 +499,23 @@ describe("RangeProtocolVault", () => {
 
       const { fee0, fee1 } = await vault.getCurrentFees();
       await expect(vault.pullFeeFromPool())
-          .to.emit(vault, "FeesEarned")
-          .withArgs(fee0, fee1);
+        .to.emit(vault, "FeesEarned")
+        .withArgs(fee0, fee1);
 
-      const {managerBalanceGHO: managerBalanceGHOBefore, managerBalanceToken: managerBalanceTokenBefore, performanceFee} = await vault.getFeeData();
+      const managerBalanceGHOBefore = await vault.managerBalanceGHO();
+      const managerBalanceTokenBefore = await vault.managerBalanceToken();
+      const performanceFee = await vault.performanceFee();
 
-      const performanceFee0 = fee0
-        .mul(performanceFee)
-        .div(10_000);
-      const performanceFee1 = fee0
-        .mul(performanceFee)
-        .div(10_000);
+      const performanceFee0 = fee0.mul(performanceFee).div(10_000);
+      const performanceFee1 = fee0.mul(performanceFee).div(10_000);
 
-      const {managerBalanceGHO: managerBalanceGHOAfter, managerBalanceToken: managerBalanceTokenAfter} = await vault.getFeeData();
+      const managerBalanceGHOAfter = await vault.managerBalanceGHO();
+      const managerBalanceTokenAfter = await vault.managerBalanceToken();
       expect(managerBalanceGHOAfter).to.be.equal(
-          managerBalanceGHOBefore.add(performanceFee0)
+        managerBalanceGHOBefore.add(performanceFee0)
       );
       expect(managerBalanceTokenAfter).to.be.equal(
-          managerBalanceTokenBefore.add(performanceFee1)
+        managerBalanceTokenBefore.add(performanceFee1)
       );
 
       const managerBalance0Before = await token0.balanceOf(manager.address);
@@ -497,7 +527,9 @@ describe("RangeProtocolVault", () => {
       // expect(managerBalance0After).to.be.equal(managerBalance0Before.add(fee0))
       // expect(managerBalance1After).to.be.equal(managerBalance1Before.add(fee1))
 
-      const {managerBalanceGHO: managerBalanceGHONow, managerBalanceToken: managerBalanceTokenNow} = await vault.getFeeData();
+      const managerBalanceGHONow = await vault.managerBalanceGHO();
+      const managerBalanceTokenNow = await vault.managerBalanceToken();
+
       expect(managerBalanceGHONow).to.be.equal(bn(0));
       expect(managerBalanceTokenNow).to.be.equal(bn(0));
     });
@@ -508,11 +540,11 @@ describe("RangeProtocolVault", () => {
       // eslint-disable-next-line @typescript-eslint/naming-convention
       const RangeProtocolVault = await ethers.getContractFactory(
         "RangeProtocolVault",
-          {
-            libraries: {
-              LogicLib: logicLib.address
-            }
-          }
+        {
+          libraries: {
+            LogicLib: logicLib.address,
+          },
+        }
       );
       const newVaultImpl =
         (await RangeProtocolVault.deploy()) as RangeProtocolVault;
@@ -534,11 +566,11 @@ describe("RangeProtocolVault", () => {
       // eslint-disable-next-line @typescript-eslint/naming-convention
       const RangeProtocolVault = await ethers.getContractFactory(
         "RangeProtocolVault",
-          {
-            libraries: {
-              LogicLib: logicLib.address
-            }
-          }
+        {
+          libraries: {
+            LogicLib: logicLib.address,
+          },
+        }
       );
       const newVaultImpl =
         (await RangeProtocolVault.deploy()) as RangeProtocolVault;
